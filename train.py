@@ -40,6 +40,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--skip-phase3", action="store_true",
                    help="Skip the real-image fine-tuning phase.")
     p.add_argument("--device", default=None, help="Override config device (cpu/cuda/mps/auto).")
+    p.add_argument("--train-samples", type=int, default=None,
+                   help="Override data.train_samples (e.g. 5000 for fast Colab runs).")
+    p.add_argument("--val-samples", type=int, default=None,
+                   help="Override data.val_samples.")
+    p.add_argument("--epochs-phase1", type=int, default=None)
+    p.add_argument("--epochs-phase2", type=int, default=None)
+    p.add_argument("--num-workers", type=int, default=None,
+                   help="Override data.num_workers (Colab T4 = 2 vCPUs; try 2).")
     return p.parse_args()
 
 
@@ -82,6 +90,9 @@ def main() -> None:
     set_seed(cfg.get("seed", 42))
 
     trainer_cfg = build_trainer_config(cfg, smoke=args.smoke, device_override=args.device)
+    # CLI overrides (handy on Colab where you want to shrink for speed).
+    if args.epochs_phase1 is not None: trainer_cfg.phase1.epochs = args.epochs_phase1
+    if args.epochs_phase2 is not None: trainer_cfg.phase2.epochs = args.epochs_phase2
 
     # Data
     catalog = load_hyg_catalog(
@@ -89,8 +100,8 @@ def main() -> None:
         mag_limit=cfg["data"]["catalog_mag_limit"],
     )
 
-    train_n = cfg["data"]["train_samples"] if not args.smoke else 256
-    val_n = cfg["data"]["val_samples"] if not args.smoke else 64
+    train_n = args.train_samples or (cfg["data"]["train_samples"] if not args.smoke else 256)
+    val_n = args.val_samples or (cfg["data"]["val_samples"] if not args.smoke else 64)
 
     train_tfm = build_train_transforms(cfg["data"]["image_size"])
     eval_tfm = build_eval_transforms(cfg["data"]["image_size"])
@@ -113,14 +124,19 @@ def main() -> None:
         transform=eval_tfm,
         seed=10_000 + cfg.get("seed", 42),
     )
-    n_workers = 0 if args.smoke else cfg["data"]["num_workers"]
+    n_workers = args.num_workers if args.num_workers is not None else (
+        0 if args.smoke else cfg["data"]["num_workers"]
+    )
+    persistent = n_workers > 0
     train_loader = DataLoader(
         train_ds, batch_size=trainer_cfg.batch_size, shuffle=True,
         num_workers=n_workers, pin_memory=torch.cuda.is_available(), drop_last=True,
+        persistent_workers=persistent,
     )
     val_loader = DataLoader(
         val_ds, batch_size=trainer_cfg.batch_size, shuffle=False,
         num_workers=n_workers, pin_memory=torch.cuda.is_available(),
+        persistent_workers=persistent,
     )
 
     # Model
