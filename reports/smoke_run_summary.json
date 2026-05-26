@@ -1,0 +1,10 @@
+{
+  "phases_run": [
+    "phase1"
+  ],
+  "epochs_total": 1,
+  "best_val_ang_sep_deg": 87.53014373779297,
+  "final_train_loss": 2.0780788138508797,
+  "final_val_loss": 2.639065980911255,
+  "note": "smoke run only: 1 epoch per phase, 256 train / 64 val samples on CPU. Run train.py without --smoke for real numbers."
+}

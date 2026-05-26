@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m py_compile src/astrometry_api.py src/preprocess.py src/geolocation.py src/visualize.py src/app.py)",
+      "Bash(python3 -m py_compile src/astrometry_api.py src/app.py)",
+      "Bash(.venv/bin/python --version)",
+      "Bash(.venv/bin/pip list *)",
+      "Bash(xargs -0 .venv/bin/python -m py_compile)",
+      "Bash(.venv/bin/python -m py_compile train.py evaluate.py)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python -c \"import torch, torchvision; print\\('torch', torch.__version__, 'cuda:', torch.cuda.is_available\\(\\), 'mps:', torch.backends.mps.is_available\\(\\)\\); print\\('torchvision', torchvision.__version__\\)\")",
+      "Bash(curl -sL -o data/catalogs/hygdata_v3.csv https://raw.githubusercontent.com/astronexus/HYG-Database/master/hyg/v3/hyg_v36.csv)",
+      "Bash(curl -sL -I https://github.com/astronexus/HYG-Database/raw/main/hyg/CURRENT/hyg_v42.csv)",
+      "Bash(curl -sL -I https://raw.githubusercontent.com/astronexus/HYG-Database/main/hyg/CURRENT/hyg_v42.csv)",
+      "Bash(curl -sL https://api.github.com/repos/astronexus/HYG-Database/contents/hyg)",
+      "Bash(curl -sL https://api.github.com/repos/astronexus/HYG-Database/contents/hyg/CURRENT)",
+      "Bash(python3 -c \"import json,sys; print\\('\\\\n'.join\\(f['download_url'] for f in json.load\\(sys.stdin\\) if f.get\\('download_url'\\) and 'csv' in f.get\\('name', ''\\)\\)\\)\")",
+      "Bash(curl -sL -o data/catalogs/hygdata_v3.csv https://raw.githubusercontent.com/astronexus/HYG-Database/main/hyg/CURRENT/hygdata_v41.csv)",
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(.venv/bin/python train.py --config configs/default.yaml --smoke --skip-phase3 --device cpu)",
+      "Bash(.venv/bin/python scripts/generate_readme_figures.py)",
+      "Bash(.venv/bin/python -c 'import json; json.load\\(open\\('\\\\''__TRACKED_VAR__'\\\\''\\)\\)')",
+      "Bash(.venv/bin/python -c \"import json; json.load\\(open\\('notebooks/colab_train.ipynb'\\)\\)\")"
+    ]
+  }
+}

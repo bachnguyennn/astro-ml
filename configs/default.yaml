@@ -1,0 +1,56 @@
+# AstroLoc-ML default training config.
+# All paths are relative to the repository root.
+
+seed: 42
+
+data:
+  catalog_path: data/catalogs/hygdata_v3.csv
+  catalog_mag_limit: 8.0           # keep stars brighter than this
+  image_size: 224
+  field_width_range: [15.0, 80.0]  # degrees, uniform sample at train time
+  noise_level: 0.02
+  sky_gradient: true
+  train_samples: 50000
+  val_samples: 2000
+  num_workers: 4
+
+real_data:
+  enabled: false                   # flip to true once data/real_images is populated
+  images_dir: data/real_images
+  calibrations_glob: data/real_images/*.json
+
+model:
+  name: efficientnet_b0
+  dropout_p_1: 0.3
+  dropout_p_2: 0.2
+  hidden_dim: 256
+
+train:
+  batch_size: 32
+  amp: true                        # mixed precision (no-op on CPU)
+  device: auto                     # "cpu", "cuda", or "auto"
+  early_stopping_patience: 5
+
+  phase1:                          # head only, backbone frozen
+    epochs: 5
+    lr_head: 1.0e-3
+  phase2:                          # backbone fine-tune
+    epochs: 15
+    lr_backbone_early: 1.0e-5
+    lr_backbone_late: 5.0e-5
+    lr_head: 1.0e-4
+    unfreeze_last_n_blocks: 3
+  phase3:                          # real-image fine-tune
+    epochs: 10
+    lr_backbone_early: 1.0e-6
+    lr_backbone_late: 1.0e-5
+    lr_head: 5.0e-5
+
+loss:
+  rotation_weight: 0.1
+  scale_weight: 0.1
+
+output:
+  checkpoint_dir: checkpoints
+  log_dir: checkpoints/runs
+  best_name: best.pt

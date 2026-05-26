@@ -1,0 +1,40 @@
+# Secrets
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+.eggs/
+build/
+dist/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# ML artifacts (too large for git)
+checkpoints/*.pt
+checkpoints/*.pth
+checkpoints/*.ckpt
+checkpoints/runs/
+mlruns/
+wandb/
+
+# Large data files (catalogs ok, downloaded images not)
+data/catalogs/hygdata_v3.csv
+data/real_images/*.jpg
+data/real_images/*.png
+data/real_images/*.json
+data/test_images/*.jpg
+data/test_images/*.png
