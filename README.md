@@ -224,32 +224,27 @@ honest gap.
 
 ```
 astroloc-ml/
-├── notebooks/                       # 9 end-to-end runnable notebooks
-│                                    # + local_train.ipynb + colab_train.ipynb
+├── notebooks/
+│   └── astroloc_ml_demo.ipynb       # one end-to-end walkthrough w/ interpretation
 ├── src/
 │   ├── data/                        # catalog + renderer + dataset + augs
 │   ├── models/
 │   │   ├── astrolocnet.py           # 7-output (sin/cos) EfficientNet-B0
 │   │   └── classical_solver.py      # triangle-hash baseline
 │   ├── training/                    # sin/cos loss, trainer, metrics
-│   ├── inference/                   # predict + overlay/map plots
+│   ├── inference/                   # predict + overlay plots
 │   └── utils/                       # gnomonic projection, EXIF, image I/O
 ├── data/
-│   ├── catalogs/hygdata_v3.csv      # gitignored (download script in folder)
-│   ├── real_images/                 # gitignored
-│   └── test_images/                 # gitignored
-├── checkpoints/
-│   ├── best.pt                      # current trained model (gitignored)
-│   └── legacy_4output/              # archived pre-sin/cos checkpoints
+│   ├── catalogs/hygdata_v3.csv      # gitignored (download command below)
+│   ├── real_images/                 # gitignored (Phase 3 fine-tuning)
+│   └── test_images/                 # gitignored (hold-out)
+├── checkpoints/best.pt              # gitignored
 ├── reports/
 │   ├── figures/                     # README images (regen by script)
-│   ├── standard_run_sincos.log      # most recent training log
 │   └── smoke_run_summary.json
-├── scripts/
-│   ├── generate_readme_figures.py
-│   └── extract_colab_report.py
-├── configs/default.yaml             # all hyperparameters
-├── train.py                         # CLI training (with --train-samples etc.)
+├── scripts/generate_readme_figures.py
+├── configs/default.yaml
+├── train.py                         # CLI training
 ├── evaluate.py                      # CLI evaluation
 ├── requirements.txt
 ├── .env.example
@@ -309,9 +304,6 @@ The trainer now **respects existing `checkpoints/best.pt`** when
 re-launched, so a worse re-run won't overwrite a better earlier
 checkpoint.
 
-Colab walkthrough: [`notebooks/colab_train.ipynb`](notebooks/colab_train.ipynb).
-Local walkthrough: [`notebooks/local_train.ipynb`](notebooks/local_train.ipynb).
-
 ---
 
 ## 📊 Evaluation
@@ -329,24 +321,27 @@ Outputs JSON metrics to stdout and to `reports/eval_<source>.json`.
 
 ---
 
-## 📒 Notebooks
+## 📒 Notebook
+
+A single end-to-end walkthrough covering data exploration, the renderer,
+the model, the loss function story, training history, the classical
+solver baseline, and an honest interpretation of the results:
 
 ```
-notebooks/
-├── 01_data_exploration.ipynb        HYG stats, sky coverage, sample comparison
-├── 02_synthetic_data_pipeline.ipynb Gnomonic projection, FOV grid, augmentations
-├── 03_model_architecture.ipynb      EfficientNet head + freezing strategy
-├── 04_loss_function.ipynb           Why MSE is wrong; sin/cos derivation
-├── 05_training.ipynb                Smoke training + training curves inline
-├── 06_classical_solver.ipynb        Triangle hashing explained step by step
-├── 07_ablation_study.ipynb          ML vs classical on shared test set
-├── 08_evaluation.ipynb              Error distribution, error-by-sky map
-├── 09_full_pipeline_demo.ipynb      End-to-end demo on 3 images + map pin
-├── local_train.ipynb                Train end-to-end on your machine (MPS/CUDA)
-└── colab_train.ipynb                Train on Google Colab (GPU)
+notebooks/astroloc_ml_demo.ipynb
 ```
 
-All notebooks are top-to-bottom runnable against the `src/` package.
+Open it from the project root:
+
+```bash
+source .venv/bin/activate
+pip install jupyter ipykernel
+jupyter notebook notebooks/astroloc_ml_demo.ipynb
+```
+
+The notebook is top-to-bottom runnable against the `src/` package. It
+loads the trained checkpoint at `checkpoints/best.pt` if present;
+otherwise it tells you how to run a smoke training first.
 
 ---
 
