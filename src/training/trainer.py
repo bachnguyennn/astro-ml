@@ -107,6 +107,29 @@ class Trainer:
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.progress_cb = progress_cb or (lambda evt: None)
 
+        # If a previous best.pt exists, seed best_metric from it so a re-launched
+        # training doesn't overwrite a better earlier checkpoint with a fresh
+        # epoch's worse value. The weights themselves are NOT loaded here —
+        # that's still the caller's job (pretrained backbone or load_state).
+        prev_best = self.checkpoint_dir / config.best_name
+        if prev_best.exists():
+            try:
+                prev = torch.load(prev_best, map_location="cpu", weights_only=False)
+                # Only inherit if shape-compatible (don't carry stale metric
+                # across a model-architecture change).
+                prev_sd = prev.get("state_dict", {})
+                if all(model.state_dict()[k].shape == v.shape
+                       for k, v in prev_sd.items() if k in model.state_dict()):
+                    self.best_metric = float(prev.get("best_metric", float("inf")))
+                    print(f"[trainer] Found previous {prev_best.name}: "
+                          f"seeding best_metric = {self.best_metric:.4f}° "
+                          f"(new checkpoints only saved if they beat this).")
+                else:
+                    print(f"[trainer] Previous {prev_best.name} has a different "
+                          "model shape — ignoring its best_metric.")
+            except Exception as exc:
+                print(f"[trainer] Could not seed best_metric from {prev_best}: {exc}")
+
     # ------------------------------------------------------------------ #
     # Public phases
     # ------------------------------------------------------------------ #

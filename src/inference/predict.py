@@ -55,10 +55,11 @@ def predict_image(
 
     transform = build_eval_transforms(image_size)
     tensor = transform(pil).unsqueeze(0).to(device)
-    out = model(tensor).squeeze(0).cpu().numpy()
+    raw = model(tensor)
+    decoded = AstroLocNet.decode_predictions(raw).squeeze(0).cpu().numpy()
     return Prediction(
-        ra_deg=float(wrap_ra_deg(out[0])),
-        dec_deg=float(clamp_dec_deg(out[1])),
-        rotation_deg=float(wrap_ra_deg(out[2])),
-        field_width_deg=float(np.exp(out[3])),
+        ra_deg=float(wrap_ra_deg(decoded[0])),
+        dec_deg=float(clamp_dec_deg(decoded[1])),
+        rotation_deg=float(wrap_ra_deg(decoded[2])),
+        field_width_deg=float(np.exp(decoded[3])),
     )

@@ -28,8 +28,16 @@ checkpoints/*.pt
 checkpoints/*.pth
 checkpoints/*.ckpt
 checkpoints/runs/
+checkpoints/legacy_4output/
 mlruns/
 wandb/
+
+# Training logs and ad-hoc outputs at repo root
+reports/*.log
+/output.png
+/output1.png
+/output2.png
+/valvstrain.png
 
 # Large data files (catalogs ok, downloaded images not)
 data/catalogs/hygdata_v3.csv

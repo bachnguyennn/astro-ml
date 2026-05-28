@@ -1,4 +1,8 @@
-"""Training and evaluation metrics."""
+"""Training and evaluation metrics.
+
+Operates on the **decoded** prediction tensor (4-column degree values)
+so the numbers stay comparable to the legacy raw-output model.
+"""
 
 from __future__ import annotations
 
@@ -8,9 +12,19 @@ from typing import Dict, List
 import numpy as np
 import torch
 
+from src.models.astrolocnet import AstroLocNet
+
+
+def _maybe_decode(pred: torch.Tensor) -> torch.Tensor:
+    """Decode 7-D sin/cos outputs to 4-D degree outputs (no-op if already 4-D)."""
+    if pred.shape[-1] == AstroLocNet.OUTPUT_DIM:
+        return AstroLocNet.decode_predictions(pred)
+    return pred
+
 
 def angular_separation_deg_torch(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     """Per-sample great-circle separation in degrees. Returns ``[B]`` tensor."""
+    pred = _maybe_decode(pred)
     ra_p = torch.deg2rad(pred[:, 0])
     dec_p = torch.deg2rad(pred[:, 1])
     ra_t = torch.deg2rad(target[:, 0])
@@ -23,11 +37,15 @@ def angular_separation_deg_torch(pred: torch.Tensor, target: torch.Tensor) -> to
 
 
 def compute_metrics(pred: torch.Tensor, target: torch.Tensor) -> Dict[str, float]:
-    sep = angular_separation_deg_torch(pred, target)
+    pred_dec = _maybe_decode(pred)
+    sep = angular_separation_deg_torch(pred_dec, target)
+
     # Rotation MAE with wrap-around.
-    rot_diff = (pred[:, 2] - target[:, 2]) % 360.0
+    rot_diff = (pred_dec[:, 2] - target[:, 2]) % 360.0
     rot_diff = torch.minimum(rot_diff, 360.0 - rot_diff)
-    scale_mae = torch.abs(torch.exp(pred[:, 3]) - torch.exp(target[:, 3]))
+
+    scale_mae = torch.abs(torch.exp(pred_dec[:, 3]) - torch.exp(target[:, 3]))
+
     return {
         "ang_sep_mean_deg": float(sep.mean().item()),
         "ang_sep_median_deg": float(sep.median().item()),

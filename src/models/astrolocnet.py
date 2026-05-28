@@ -1,8 +1,39 @@
-"""AstroLocNet: EfficientNet-B0 backbone + regression head."""
+"""AstroLocNet: EfficientNet-B0 backbone + 7-output regression head.
+
+Parameterization choice
+-----------------------
+Earlier versions predicted raw ``[ra_deg, dec_deg, rotation_deg, log_scale]``
+and relied on a haversine loss to handle the RA / rotation wrap-around at
+0°/360°. Empirically this trains very slowly: the network has no incentive
+to keep predictions in the valid ranges ([0, 360), [-90, +90]), so the
+optimizer wanders in unbounded space and converges to barely-better-than-
+random.
+
+The fix is the standard one for spherical / pose regression — predict
+``(sin, cos)`` pairs for every wrapping angle and reconstruct the angle
+via ``atan2``. The loss surface becomes smooth everywhere and the
+network never has to learn a discontinuous mapping.
+
+Output layout
+~~~~~~~~~~~~~
+::
+
+    [0] sin(RA)        in [-1, 1]
+    [1] cos(RA)
+    [2] sin(Dec)
+    [3] cos(Dec)
+    [4] sin(rotation)
+    [5] cos(rotation)
+    [6] log(field_width_deg)
+
+Use :func:`AstroLocNet.decode_predictions` to turn raw outputs into
+degree-valued ``[ra, dec, rotation, log_scale]`` tensors compatible
+with the legacy 4-column label format.
+"""
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Tuple
 
 import torch
 from torch import nn
@@ -10,15 +41,9 @@ from torchvision.models import EfficientNet_B0_Weights, efficientnet_b0
 
 
 class AstroLocNet(nn.Module):
-    """Predicts ``[ra_deg, dec_deg, rotation_deg, log_field_width_deg]``.
+    """EfficientNet-B0 backbone + 7-output sin/cos regression head."""
 
-    Note on the output head: we intentionally regress raw (RA, Dec)
-    rather than (sin, cos) pairs. The wrap-around problem is handled by
-    the angular-separation loss, not by the parameterization. See
-    ``notebooks/04_loss_function.ipynb`` for the discussion.
-    """
-
-    OUTPUT_DIM = 4  # ra, dec, rotation, log_scale
+    OUTPUT_DIM = 7  # sin_ra, cos_ra, sin_dec, cos_dec, sin_rot, cos_rot, log_scale
 
     def __init__(
         self,
@@ -42,7 +67,41 @@ class AstroLocNet(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Returns raw 7-D outputs (NOT decoded to angles)."""
         return self.backbone(x)
+
+    # ------------------------------------------------------------------ #
+    # Encode / decode between (RA, Dec, rot, log_scale) and the 7-D head.
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def encode_labels(labels_deg: torch.Tensor) -> torch.Tensor:
+        """``[B, 4]`` (ra, dec, rot, log_scale) → ``[B, 7]`` sin/cos targets."""
+        ra = torch.deg2rad(labels_deg[:, 0])
+        dec = torch.deg2rad(labels_deg[:, 1])
+        rot = torch.deg2rad(labels_deg[:, 2])
+        log_scale = labels_deg[:, 3]
+        return torch.stack([
+            torch.sin(ra), torch.cos(ra),
+            torch.sin(dec), torch.cos(dec),
+            torch.sin(rot), torch.cos(rot),
+            log_scale,
+        ], dim=-1)
+
+    @staticmethod
+    def decode_predictions(preds: torch.Tensor) -> torch.Tensor:
+        """``[B, 7]`` raw outputs → ``[B, 4]`` (ra, dec, rot, log_scale) in degrees.
+
+        Uses ``atan2(sin, cos)`` so the result is always in a valid range
+        regardless of the raw output magnitudes (the network does not
+        need to learn to produce unit-norm pairs).
+        """
+        ra = torch.rad2deg(torch.atan2(preds[:, 0], preds[:, 1])) % 360.0
+        dec = torch.rad2deg(torch.atan2(preds[:, 2], preds[:, 3]))
+        dec = torch.clamp(dec, -90.0, 90.0)
+        rot = torch.rad2deg(torch.atan2(preds[:, 4], preds[:, 5])) % 360.0
+        log_scale = preds[:, 6]
+        return torch.stack([ra, dec, rot, log_scale], dim=-1)
 
     # ------------------------------------------------------------------ #
     # Parameter group helpers — used by the trainer to set differential LRs.
@@ -54,16 +113,10 @@ class AstroLocNet(nn.Module):
 
     @property
     def backbone_feature_parameters(self) -> List[nn.Parameter]:
-        # Everything except the classifier head.
         return [p for n, p in self.backbone.named_parameters() if not n.startswith("classifier")]
 
     def block_parameters(self, block_idx: int) -> List[nn.Parameter]:
-        """Return the parameters of a specific EfficientNet feature block.
-
-        EfficientNet-B0's feature stack has 9 entries (indices 0..8).
-        Index 0 is the stem; indices 1..7 are the MBConv stages;
-        index 8 is the head conv.
-        """
+        """Return parameters of a specific EfficientNet feature block (0..8)."""
         block = self.backbone.features[block_idx]
         return list(block.parameters())
 
@@ -87,8 +140,8 @@ def unfreeze_last_n_blocks(model: AstroLocNet, n: int = 3) -> int:
     """Unfreeze the final ``n`` feature blocks. Returns count unfrozen.
 
     EfficientNet-B0 has 9 feature blocks (indices 0..8). ``n=3`` unfreezes
-    blocks 6, 7, 8 — the high-level stages that are most useful to adapt
-    to the synthetic star-field domain.
+    blocks 6, 7, 8 — the high-level stages most useful to adapt to the
+    synthetic star-field domain.
     """
     total_blocks = len(model.backbone.features)
     start = max(0, total_blocks - n)
